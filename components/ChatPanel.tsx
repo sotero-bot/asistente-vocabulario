@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Image from "next/image";
 import { GlossaryTerm, UserProfile } from "@/lib/glossary";
 
 interface Message {
@@ -121,18 +122,22 @@ export default function ChatPanel({ profile, pendingTerm, onTermConsumed }: Chat
     return content
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      .replace(/`(.*?)`/g, '<code class="bg-slate-700 px-1 rounded text-blue-300 text-sm">$1</code>')
+      .replace(/`(.*?)`/g, '<code class="bg-slate-100 px-1.5 rounded text-blue-600 text-xs font-mono">$1</code>')
       .replace(/\n/g, "<br/>");
   };
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-3 border-b border-slate-700 flex items-center gap-2">
-        <span className="text-lg">{profile.icon}</span>
-        <div>
-          <p className="text-white text-sm font-medium">Asistente IA</p>
-          <p className="text-slate-400 text-xs">{profile.label}</p>
-        </div>
+      <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center gap-3">
+        <Image
+          src="/logo-horizontal.png"
+          alt="GlosarioIA"
+          width={120}
+          height={36}
+          className="object-contain"
+        />
+        <span className="text-slate-300">|</span>
+        <span className="text-slate-500 text-sm">{profile.icon} {profile.label}</span>
         <button
           onClick={() =>
             setMessages([
@@ -142,21 +147,21 @@ export default function ChatPanel({ profile, pendingTerm, onTermConsumed }: Chat
               },
             ])
           }
-          className="ml-auto text-slate-500 hover:text-slate-300 text-xs transition-colors"
+          className="ml-auto text-slate-400 hover:text-blue-600 text-xs transition-colors"
           title="Reiniciar chat"
         >
           ↺ Reiniciar
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
                 msg.role === "user"
                   ? "bg-blue-600 text-white rounded-br-sm"
-                  : "bg-slate-700 text-slate-100 rounded-bl-sm"
+                  : "bg-white text-slate-700 rounded-bl-sm border border-slate-100"
               }`}
               dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }}
             />
@@ -164,11 +169,11 @@ export default function ChatPanel({ profile, pendingTerm, onTermConsumed }: Chat
         ))}
         {loading && messages[messages.length - 1]?.content === "" && (
           <div className="flex justify-start">
-            <div className="bg-slate-700 rounded-2xl rounded-bl-sm px-4 py-3">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+            <div className="bg-white border border-slate-100 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
+              <div className="flex gap-1 items-center">
+                <span className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                <span className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
               </div>
             </div>
           </div>
@@ -176,7 +181,7 @@ export default function ChatPanel({ profile, pendingTerm, onTermConsumed }: Chat
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="p-3 border-t border-slate-700 flex gap-2">
+      <form onSubmit={handleSubmit} className="p-3 bg-white border-t border-slate-200 flex gap-2">
         <input
           ref={inputRef}
           type="text"
@@ -184,12 +189,12 @@ export default function ChatPanel({ profile, pendingTerm, onTermConsumed }: Chat
           onChange={(e) => setInput(e.target.value)}
           placeholder="Pregunta sobre cualquier término..."
           disabled={loading}
-          className="flex-1 bg-slate-700 text-white placeholder-slate-400 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          className="flex-1 bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 disabled:opacity-50 transition-colors"
         />
         <button
           type="submit"
           disabled={loading || !input.trim()}
-          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl px-4 py-2.5 text-sm font-medium transition-colors"
+          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl px-4 py-2.5 text-sm font-medium transition-colors shadow-sm"
         >
           Enviar
         </button>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { UserProfile, USER_PROFILES } from "@/lib/glossary";
 
 interface OnboardingProps {
@@ -23,15 +24,23 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-white flex items-center justify-center p-6">
       <div className="max-w-2xl w-full">
         <div className="text-center mb-10">
-          <div className="text-5xl mb-4">🤖</div>
-          <h1 className="text-3xl font-bold text-white mb-2">GlosarioIA</h1>
-          <p className="text-slate-400 text-lg">
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/logo-horizontal.png"
+              alt="GlosarioIA"
+              width={260}
+              height={80}
+              priority
+              className="object-contain"
+            />
+          </div>
+          <p className="text-slate-600 text-lg">
             Tu glosario personalizado de Inteligencia Artificial y Agentes
           </p>
-          <p className="text-slate-500 mt-3 text-sm">
+          <p className="text-slate-400 mt-3 text-sm">
             Selecciona tu área profesional para recibir explicaciones adaptadas a tu contexto
           </p>
         </div>
@@ -41,10 +50,10 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
             <button
               key={profile.profession}
               onClick={() => onSelect(profile)}
-              className="flex items-center gap-4 p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-blue-500 rounded-xl transition-all duration-200 text-left group"
+              className="flex items-center gap-4 p-4 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-400 rounded-xl transition-all duration-200 text-left group shadow-sm"
             >
               <span className="text-3xl">{profile.icon}</span>
-              <span className="text-white font-medium group-hover:text-blue-400 transition-colors">
+              <span className="text-slate-700 font-medium group-hover:text-blue-600 transition-colors">
                 {profile.label}
               </span>
             </button>
@@ -52,7 +61,7 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
         </div>
 
         <div className="mt-6">
-          <p className="text-slate-500 text-sm text-center mb-3">
+          <p className="text-slate-400 text-sm text-center mb-3">
             ¿Tu profesión no aparece? Escríbela aquí
           </p>
           <form onSubmit={handleCustomSubmit} className="flex gap-2">
@@ -61,12 +70,12 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
               value={customProfession}
               onChange={(e) => setCustomProfession(e.target.value)}
               placeholder="Ej: Arquitecto, Periodista, Chef..."
-              className="flex-1 bg-slate-800 border border-slate-700 focus:border-blue-500 text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm focus:outline-none transition-colors"
+              className="flex-1 bg-white border border-slate-200 focus:border-blue-400 text-slate-800 placeholder-slate-400 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors shadow-sm"
             />
             <button
               type="submit"
               disabled={!customProfession.trim()}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl px-5 py-3 text-sm font-medium transition-colors"
+              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl px-5 py-3 text-sm font-medium transition-colors shadow-sm"
             >
               Continuar
             </button>

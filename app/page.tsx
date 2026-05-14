@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Onboarding from "@/components/Onboarding";
 import GlossaryPanel from "@/components/GlossaryPanel";
 import ChatPanel from "@/components/ChatPanel";
@@ -21,19 +22,22 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col">
-      <header className="border-b border-slate-700 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🤖</span>
-          <h1 className="text-white font-bold text-lg">GlosarioIA</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-slate-400 text-sm hidden sm:inline">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <header className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between shadow-sm">
+        <Image
+          src="/logo-horizontal.png"
+          alt="GlosarioIA"
+          width={140}
+          height={40}
+          className="object-contain"
+        />
+        <div className="flex items-center gap-3">
+          <span className="text-slate-500 text-sm hidden sm:inline">
             {profile.icon} {profile.label}
           </span>
           <button
             onClick={() => setProfile(null)}
-            className="text-slate-500 hover:text-slate-300 text-xs underline transition-colors"
+            className="text-slate-400 hover:text-blue-600 text-xs underline transition-colors"
           >
             Cambiar perfil
           </button>
@@ -41,12 +45,12 @@ export default function Home() {
       </header>
 
       {/* Mobile tab switcher */}
-      <div className="md:hidden flex border-b border-slate-700">
+      <div className="md:hidden flex bg-white border-b border-slate-200">
         <button
           onClick={() => setActiveView("glossary")}
           className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
             activeView === "glossary"
-              ? "text-blue-400 border-b-2 border-blue-400"
+              ? "text-blue-600 border-b-2 border-blue-600"
               : "text-slate-400"
           }`}
         >
@@ -56,7 +60,7 @@ export default function Home() {
           onClick={() => setActiveView("chat")}
           className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
             activeView === "chat"
-              ? "text-blue-400 border-b-2 border-blue-400"
+              ? "text-blue-600 border-b-2 border-blue-600"
               : "text-slate-400"
           }`}
         >
@@ -65,17 +69,17 @@ export default function Home() {
       </div>
 
       <main className="flex-1 flex overflow-hidden">
-        {/* Desktop: always show both panels */}
+        {/* Desktop */}
         <div className="hidden md:flex w-full overflow-hidden" style={{ height: "calc(100vh - 57px)" }}>
-          <div className="w-80 border-r border-slate-700 flex flex-col overflow-hidden">
-            <div className="p-3 border-b border-slate-700">
-              <p className="text-slate-400 text-xs font-medium uppercase tracking-wide">
-                📚 Glosario ({GLOSSARY_TERMS.length} términos)
+          <div className="w-80 bg-white border-r border-slate-200 flex flex-col overflow-hidden">
+            <div className="p-3 border-b border-slate-100">
+              <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                📚 Glosario · {GLOSSARY_TERMS.length} términos
               </p>
             </div>
             <GlossaryPanel onTermClick={handleTermClick} />
           </div>
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
             <ChatPanel
               profile={profile}
               pendingTerm={pendingTerm}
@@ -84,8 +88,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Mobile: show one panel at a time */}
-        <div className="md:hidden flex-1 flex flex-col overflow-hidden" style={{ height: "calc(100vh - 105px)" }}>
+        {/* Mobile */}
+        <div className="md:hidden flex-1 flex flex-col overflow-hidden bg-white" style={{ height: "calc(100vh - 105px)" }}>
           {activeView === "glossary" ? (
             <GlossaryPanel onTermClick={handleTermClick} />
           ) : (

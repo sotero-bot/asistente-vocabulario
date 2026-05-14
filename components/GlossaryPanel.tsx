@@ -20,22 +20,22 @@ export default function GlossaryPanel({ onTermClick }: GlossaryPanelProps) {
   });
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-slate-700">
+    <div className="flex flex-col h-full bg-white">
+      <div className="p-3 border-b border-slate-100">
         <input
           type="text"
           placeholder="Buscar término..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-slate-700 text-white placeholder-slate-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors"
         />
         <div className="flex flex-wrap gap-1 mt-2">
           <button
             onClick={() => setActiveCategory(null)}
-            className={`text-xs px-2 py-1 rounded-md transition-colors ${
+            className={`text-xs px-2.5 py-1 rounded-full transition-colors font-medium ${
               !activeCategory
                 ? "bg-blue-600 text-white"
-                : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
             }`}
           >
             Todos
@@ -44,10 +44,10 @@ export default function GlossaryPanel({ onTermClick }: GlossaryPanelProps) {
             <button
               key={cat}
               onClick={() => setActiveCategory(cat === activeCategory ? null : cat)}
-              className={`text-xs px-2 py-1 rounded-md transition-colors ${
+              className={`text-xs px-2.5 py-1 rounded-full transition-colors font-medium ${
                 activeCategory === cat
                   ? "bg-blue-600 text-white"
-                  : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                  : "bg-slate-100 text-slate-500 hover:bg-slate-200"
               }`}
             >
               {cat}
@@ -58,7 +58,7 @@ export default function GlossaryPanel({ onTermClick }: GlossaryPanelProps) {
 
       <div className="flex-1 overflow-y-auto p-2">
         {filtered.length === 0 ? (
-          <p className="text-slate-500 text-sm text-center mt-8">
+          <p className="text-slate-400 text-sm text-center mt-8">
             No se encontraron términos
           </p>
         ) : (
@@ -66,18 +66,18 @@ export default function GlossaryPanel({ onTermClick }: GlossaryPanelProps) {
             <button
               key={term.id}
               onClick={() => onTermClick(term)}
-              className="w-full text-left p-3 rounded-lg mb-1 hover:bg-slate-700 transition-colors group"
+              className="w-full text-left p-3 rounded-xl mb-1 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all group"
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <span className="text-white font-medium text-sm group-hover:text-blue-400 transition-colors">
+                  <span className="text-slate-800 font-semibold text-sm group-hover:text-blue-600 transition-colors">
                     {term.term}
                   </span>
-                  <p className="text-slate-400 text-xs mt-0.5 line-clamp-2">
+                  <p className="text-slate-400 text-xs mt-0.5 line-clamp-2 leading-relaxed">
                     {term.shortDefinition}
                   </p>
                 </div>
-                <span className="text-xs text-slate-500 bg-slate-700 group-hover:bg-slate-600 px-1.5 py-0.5 rounded shrink-0">
+                <span className="text-xs text-slate-400 bg-slate-100 group-hover:bg-blue-100 group-hover:text-blue-500 px-2 py-0.5 rounded-full shrink-0 transition-colors">
                   {term.category}
                 </span>
               </div>
