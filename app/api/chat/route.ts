@@ -4,7 +4,7 @@ import OpenAI from "openai";
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: NextRequest) {
-  const { messages, profession, systemPromptContext } = await req.json();
+  const { messages, profession, systemPromptContext, tonePrompt } = await req.json();
 
   if (!messages || !Array.isArray(messages)) {
     return NextResponse.json({ error: "Mensajes inválidos" }, { status: 400 });
@@ -14,8 +14,12 @@ export async function POST(req: NextRequest) {
 
 ${systemPromptContext}
 
+Tono de respuesta (OBLIGATORIO): ${tonePrompt}
+Este tono es una instrucción activa que debes aplicar en tu PRÓXIMA respuesta y en todas las siguientes, sin excepción. Si el estilo de mensajes anteriores en esta conversación era diferente, ignóralo completamente y adóptate al tono indicado ahora.
+
 Reglas importantes:
 - Siempre responde en español.
+- Responde en texto plano, sin markdown, excepto para resaltar conceptos clave: usa **negrilla** únicamente en el nombre del término principal que estás explicando o en conceptos técnicos directamente relacionados. Máximo 2 o 3 palabras en negrilla por respuesta. No uses almohadillas, guiones de lista ni comillas invertidas.
 - Cuando expliques un término, adapta el ejemplo al contexto profesional del usuario (${profession}).
 - Sé conciso pero completo. Si el usuario pregunta sobre un término, primero da la definición general y luego un ejemplo específico de su sector.
 - Si el usuario pide que expliques cómo aplicar IA en su trabajo, dá recomendaciones prácticas y realistas.

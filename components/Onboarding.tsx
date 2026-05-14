@@ -27,16 +27,17 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
     <div className="min-h-screen bg-white flex items-center justify-center p-6">
       <div className="max-w-2xl w-full">
         <div className="text-center mb-10">
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-3">
             <Image
               src="/logo-horizontal.png"
-              alt="GlosarioIA"
+              alt="Asistente Vocabulario"
               width={260}
               height={80}
               priority
               className="object-contain"
             />
           </div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-4">Asistente Vocabulario</h2>
           <p className="text-slate-600 text-lg">
             Tu glosario personalizado de Inteligencia Artificial y Agentes
           </p>

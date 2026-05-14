@@ -9,7 +9,7 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "GlosarioIA — Vocabulario de IA y Agentes",
+  title: "Asistente Vocabulario",
   description: "Glosario interactivo de términos de Inteligencia Artificial y Agentes, con explicaciones personalizadas según tu área profesional.",
 };
 

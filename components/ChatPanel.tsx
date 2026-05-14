@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { GlossaryTerm, UserProfile } from "@/lib/glossary";
+import { GlossaryTerm, UserProfile, TONE_OPTIONS } from "@/lib/glossary";
 
 interface Message {
   role: "user" | "assistant";
@@ -24,6 +24,7 @@ export default function ChatPanel({ profile, pendingTerm, onTermConsumed }: Chat
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [activeTone, setActiveTone] = useState(TONE_OPTIONS[0]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -52,6 +53,7 @@ export default function ChatPanel({ profile, pendingTerm, onTermConsumed }: Chat
             messages: updatedMessages,
             profession: profile.profession,
             systemPromptContext: profile.systemPromptContext,
+            tonePrompt: activeTone.prompt,
           }),
         });
 
@@ -101,7 +103,7 @@ export default function ChatPanel({ profile, pendingTerm, onTermConsumed }: Chat
         inputRef.current?.focus();
       }
     },
-    [messages, loading, profile]
+    [messages, loading, profile, activeTone]
   );
 
   useEffect(() => {
@@ -121,8 +123,6 @@ export default function ChatPanel({ profile, pendingTerm, onTermConsumed }: Chat
   const formatMessage = (content: string) => {
     return content
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      .replace(/`(.*?)`/g, '<code class="bg-slate-100 px-1.5 rounded text-blue-600 text-xs font-mono">$1</code>')
       .replace(/\n/g, "<br/>");
   };
 
@@ -152,6 +152,25 @@ export default function ChatPanel({ profile, pendingTerm, onTermConsumed }: Chat
         >
           ↺ Reiniciar
         </button>
+      </div>
+
+      {/* Tone selector */}
+      <div className="bg-white border-b border-slate-100 px-3 py-2 flex items-center gap-1.5 overflow-x-auto">
+        <span className="text-slate-400 text-xs shrink-0 mr-1">Tono:</span>
+        {TONE_OPTIONS.map((tone) => (
+          <button
+            key={tone.id}
+            onClick={() => setActiveTone(tone)}
+            className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+              activeTone.id === tone.id
+                ? "bg-blue-600 text-white shadow-sm"
+                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+            }`}
+          >
+            <span>{tone.icon}</span>
+            <span>{tone.label}</span>
+          </button>
+        ))}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
