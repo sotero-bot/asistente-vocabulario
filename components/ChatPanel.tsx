@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import Image from "next/image";
-import { GlossaryTerm, UserProfile, TONE_OPTIONS } from "@/lib/glossary";
+import { GlossaryTerm, UserProfile, ToneOption, TONE_OPTIONS } from "@/lib/glossary";
 
 interface Message {
   role: "user" | "assistant";
@@ -11,11 +10,12 @@ interface Message {
 
 interface ChatPanelProps {
   profile: UserProfile;
+  initialTone: ToneOption;
   pendingTerm: GlossaryTerm | null;
   onTermConsumed: () => void;
 }
 
-export default function ChatPanel({ profile, pendingTerm, onTermConsumed }: ChatPanelProps) {
+export default function ChatPanel({ profile, initialTone, pendingTerm, onTermConsumed }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -24,7 +24,7 @@ export default function ChatPanel({ profile, pendingTerm, onTermConsumed }: Chat
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [activeTone, setActiveTone] = useState(TONE_OPTIONS[0]);
+  const [activeTone, setActiveTone] = useState(initialTone);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -128,34 +128,8 @@ export default function ChatPanel({ profile, pendingTerm, onTermConsumed }: Chat
 
   return (
     <div className="flex flex-col h-full">
-      <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center gap-3">
-        <Image
-          src="/logo-horizontal.png"
-          alt="GlosarioIA"
-          width={120}
-          height={36}
-          className="object-contain"
-        />
-        <span className="text-slate-300">|</span>
-        <span className="text-slate-500 text-sm">{profile.icon} {profile.label}</span>
-        <button
-          onClick={() =>
-            setMessages([
-              {
-                role: "assistant",
-                content: `Hola ${profile.icon} Chat reiniciado. ¿En qué puedo ayudarte?`,
-              },
-            ])
-          }
-          className="ml-auto text-slate-400 hover:text-blue-600 text-xs transition-colors"
-          title="Reiniciar chat"
-        >
-          ↺ Reiniciar
-        </button>
-      </div>
-
-      {/* Tone selector */}
-      <div className="bg-white border-b border-slate-100 px-3 py-2 flex items-center gap-1.5 overflow-x-auto">
+      {/* Single compact header: tone selector + reset */}
+      <div className="bg-white border-b border-slate-200 px-3 py-2 flex items-center gap-1.5 overflow-x-auto">
         <span className="text-slate-400 text-xs shrink-0 mr-1">Tono:</span>
         {TONE_OPTIONS.map((tone) => (
           <button
@@ -171,6 +145,20 @@ export default function ChatPanel({ profile, pendingTerm, onTermConsumed }: Chat
             <span>{tone.label}</span>
           </button>
         ))}
+        <button
+          onClick={() =>
+            setMessages([
+              {
+                role: "assistant",
+                content: `Hola ${profile.icon} Chat reiniciado. ¿En qué puedo ayudarte?`,
+              },
+            ])
+          }
+          className="ml-auto shrink-0 text-slate-400 hover:text-blue-600 text-xs transition-colors"
+          title="Reiniciar chat"
+        >
+          ↺ Reiniciar
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">

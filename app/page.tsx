@@ -5,15 +5,25 @@ import Image from "next/image";
 import Onboarding from "@/components/Onboarding";
 import GlossaryPanel from "@/components/GlossaryPanel";
 import ChatPanel from "@/components/ChatPanel";
-import { GlossaryTerm, UserProfile, GLOSSARY_TERMS } from "@/lib/glossary";
+import dynamic from "next/dynamic";
+const TourGuide = dynamic(() => import("@/components/TourGuide"), { ssr: false });
+import { GlossaryTerm, UserProfile, ToneOption, TONE_OPTIONS, GLOSSARY_TERMS } from "@/lib/glossary";
 
 export default function Home() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [initialTone, setInitialTone] = useState<ToneOption>(TONE_OPTIONS[0]);
   const [pendingTerm, setPendingTerm] = useState<GlossaryTerm | null>(null);
   const [activeView, setActiveView] = useState<"glossary" | "chat">("glossary");
 
   if (!profile) {
-    return <Onboarding onSelect={(p) => setProfile(p)} />;
+    return (
+      <Onboarding
+        onSelect={(p, tone) => {
+          setProfile(p);
+          setInitialTone(tone);
+        }}
+      />
+    );
   }
 
   const handleTermClick = (term: GlossaryTerm) => {
@@ -23,7 +33,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <header className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center justify-between shadow-sm">
+      <header className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center shadow-sm relative">
         <Image
           src="/logo-horizontal.png"
           alt="GlosarioIA"
@@ -31,7 +41,10 @@ export default function Home() {
           height={40}
           className="object-contain"
         />
-        <div className="flex items-center gap-3">
+        <h1 className="absolute left-1/2 -translate-x-1/2 text-base font-bold text-slate-800 hidden sm:block">
+          Asistente Vocabulario
+        </h1>
+        <div className="flex items-center gap-3 ml-auto">
           <span className="text-slate-500 text-sm hidden sm:inline">
             {profile.icon} {profile.label}
           </span>
@@ -70,8 +83,9 @@ export default function Home() {
 
       <main className="flex-1 flex overflow-hidden">
         {/* Desktop */}
+        <TourGuide />
         <div className="hidden md:flex w-full overflow-hidden" style={{ height: "calc(100vh - 57px)" }}>
-          <div className="w-80 bg-white border-r border-slate-200 flex flex-col overflow-hidden">
+          <div id="tour-glossary" className="w-80 bg-white border-r border-slate-200 flex flex-col overflow-hidden">
             <div className="p-3 border-b border-slate-100">
               <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
                 📚 Glosario · {GLOSSARY_TERMS.length} términos
@@ -79,9 +93,10 @@ export default function Home() {
             </div>
             <GlossaryPanel onTermClick={handleTermClick} />
           </div>
-          <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
+          <div id="tour-chat" className="flex-1 flex flex-col overflow-hidden bg-slate-50">
             <ChatPanel
               profile={profile}
+              initialTone={initialTone}
               pendingTerm={pendingTerm}
               onTermConsumed={() => setPendingTerm(null)}
             />
@@ -95,6 +110,7 @@ export default function Home() {
           ) : (
             <ChatPanel
               profile={profile}
+              initialTone={initialTone}
               pendingTerm={pendingTerm}
               onTermConsumed={() => setPendingTerm(null)}
             />

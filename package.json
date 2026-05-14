@@ -9,7 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@types/intro.js": "^5.1.5",
     "autoprefixer": "^10.5.0",
+    "intro.js": "^8.3.2",
     "next": "16.2.6",
     "openai": "^6.37.0",
     "postcss": "^8.5.14",

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GlossaryTerm, GLOSSARY_TERMS, CATEGORIES } from "@/lib/glossary";
+import { GlossaryTerm, GLOSSARY_TERMS } from "@/lib/glossary";
 
 interface GlossaryPanelProps {
   onTermClick: (term: GlossaryTerm) => void;
@@ -9,15 +9,10 @@ interface GlossaryPanelProps {
 
 export default function GlossaryPanel({ onTermClick }: GlossaryPanelProps) {
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-  const filtered = GLOSSARY_TERMS.filter((t) => {
-    const matchSearch =
-      t.term.toLowerCase().includes(search.toLowerCase()) ||
-      t.shortDefinition.toLowerCase().includes(search.toLowerCase());
-    const matchCategory = !activeCategory || t.category === activeCategory;
-    return matchSearch && matchCategory;
-  });
+  const filtered = GLOSSARY_TERMS.filter((t) =>
+    t.term.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -29,31 +24,12 @@ export default function GlossaryPanel({ onTermClick }: GlossaryPanelProps) {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors"
         />
-        <div className="flex flex-wrap gap-1 mt-2">
-          <button
-            onClick={() => setActiveCategory(null)}
-            className={`text-xs px-2.5 py-1 rounded-full transition-colors font-medium ${
-              !activeCategory
-                ? "bg-blue-600 text-white"
-                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-            }`}
-          >
-            Todos
-          </button>
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat === activeCategory ? null : cat)}
-              className={`text-xs px-2.5 py-1 rounded-full transition-colors font-medium ${
-                activeCategory === cat
-                  ? "bg-blue-600 text-white"
-                  : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+      </div>
+
+      <div className="px-3 py-2 border-b border-slate-100">
+        <p className="text-xs text-slate-400 leading-relaxed">
+          Haz clic en cualquier concepto para que el asistente te lo explique con ejemplos de tu área.
+        </p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-2">
