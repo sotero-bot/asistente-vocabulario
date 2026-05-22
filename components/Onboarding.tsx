@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { UserProfile, USER_PROFILES, ToneOption, TONE_OPTIONS } from "@/lib/glossary";
+import { UserProfile, USER_PROFILES, ToneOption, TONE_OPTIONS, Sector, SECTORS } from "@/lib/glossary";
 
 interface OnboardingProps {
   onSelect: (profile: UserProfile, tone: ToneOption) => void;
@@ -12,23 +12,40 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
   const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
   const [selectedTone, setSelectedTone] = useState<ToneOption>(TONE_OPTIONS[0]);
   const [customProfession, setCustomProfession] = useState("");
+  const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
+  const [customSector, setCustomSector] = useState("");
 
-  const handleContinue = () => {
-    if (!selectedProfile) return;
-    onSelect(selectedProfile, selectedTone);
+  const professionReady = !!(selectedProfile || customProfession.trim());
+  const sectorLabel = selectedSector?.label ?? customSector.trim();
+  const canContinue = professionReady && !!sectorLabel;
+
+  const resetSector = () => {
+    setSelectedSector(null);
+    setCustomSector("");
   };
 
-  const handleCustomSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const buildProfile = (): UserProfile => {
+    const sector = selectedSector?.label ?? customSector.trim();
+    if (selectedProfile) {
+      return {
+        ...selectedProfile,
+        systemPromptContext:
+          selectedProfile.systemPromptContext +
+          `\n\nIMPORTANTE: El usuario trabaja específicamente en el sector de ${sector}. Aterriza todos los ejemplos, casos de uso y referencias al contexto concreto de ese sector.`,
+      };
+    }
     const name = customProfession.trim();
-    if (!name) return;
-    const profile: UserProfile = {
+    return {
       profession: "custom",
-      label: name,
+      label: `${name} · ${sector}`,
       icon: "💼",
-      systemPromptContext: `El usuario trabaja como ${name}. Adapta tus explicaciones y ejemplos al contexto de su profesión (${name}). Usa casos de uso, flujos de trabajo y terminología relevante para alguien en ese campo. Relaciona los conceptos de IA con aplicaciones prácticas que le serían útiles en su día a día como ${name}.`,
+      systemPromptContext: `El usuario trabaja como ${name} en el sector de ${sector}. Adapta tus explicaciones y ejemplos a ese contexto específico. Usa casos de uso, flujos de trabajo y terminología relevante para un ${name} en el sector de ${sector}. Relaciona los conceptos de IA con aplicaciones prácticas que le serían útiles en su día a día.`,
     };
-    onSelect(profile, selectedTone);
+  };
+
+  const handleContinue = () => {
+    if (!canContinue) return;
+    onSelect(buildProfile(), selectedTone);
   };
 
   return (
@@ -59,6 +76,10 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
             </p>
             <p>
               <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold mr-2">2</span>
+              Selecciona el sector en el que trabajas.
+            </p>
+            <p>
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold mr-2">3</span>
               Selecciona el tono que quieres en las respuestas{" "}
               <span className="text-slate-400">(puedes cambiarlo después)</span>.
             </p>
@@ -73,7 +94,7 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
           {USER_PROFILES.map((profile) => (
             <button
               key={profile.profession}
-              onClick={() => setSelectedProfile(profile)}
+              onClick={() => { setSelectedProfile(profile); setCustomProfession(""); resetSector(); }}
               className={`flex items-center gap-4 p-4 border rounded-xl transition-all duration-200 text-left shadow-sm ${
                 selectedProfile?.profession === profile.profession
                   ? "bg-blue-50 border-blue-500 ring-2 ring-blue-200"
@@ -102,31 +123,62 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
           <p className="text-slate-400 text-sm text-center mb-3">
             ¿Tu profesión no aparece? Escríbela aquí
           </p>
-          <form onSubmit={handleCustomSubmit} className="flex gap-2">
-            <input
-              type="text"
-              value={customProfession}
-              onChange={(e) => {
-                setCustomProfession(e.target.value);
-                if (e.target.value.trim()) setSelectedProfile(null);
-              }}
-              placeholder="Ej: Arquitecto, Periodista, Chef..."
-              className="flex-1 bg-white border border-slate-200 focus:border-blue-400 text-slate-800 placeholder-slate-400 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors shadow-sm"
-            />
-            <button
-              type="submit"
-              disabled={!customProfession.trim()}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl px-5 py-3 text-sm font-medium transition-colors shadow-sm"
-            >
-              Continuar
-            </button>
-          </form>
+          <input
+            type="text"
+            value={customProfession}
+            onChange={(e) => {
+              setCustomProfession(e.target.value);
+              if (e.target.value.trim()) { setSelectedProfile(null); resetSector(); }
+            }}
+            placeholder="Ej: Arquitecto, Periodista, Chef..."
+            className="w-full bg-white border border-slate-200 focus:border-blue-400 text-slate-800 placeholder-slate-400 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors shadow-sm"
+          />
         </div>
 
-        {/* Step 2: Tone */}
+        {/* Step 2: Sector (appears once profession is ready) */}
+        {professionReady && (
+          <div className="mt-8">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              2 · Selecciona tu sector
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {SECTORS.map((sector) => (
+                <button
+                  key={sector.id}
+                  onClick={() => { setSelectedSector(sector); setCustomSector(""); }}
+                  className={`flex items-center gap-2 px-3 py-3 rounded-xl border text-sm font-medium transition-all ${
+                    selectedSector?.id === sector.id
+                      ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                      : "bg-white border-slate-200 text-slate-600 hover:border-blue-400 hover:bg-blue-50"
+                  }`}
+                >
+                  <span>{sector.icon}</span>
+                  <span>{sector.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-3">
+              <p className="text-slate-400 text-sm text-center mb-3">
+                ¿Tu sector no aparece? Escríbelo aquí
+              </p>
+              <input
+                type="text"
+                value={customSector}
+                onChange={(e) => {
+                  setCustomSector(e.target.value);
+                  if (e.target.value.trim()) setSelectedSector(null);
+                }}
+                placeholder="Ej: Energía, Turismo, Seguros..."
+                className="w-full bg-white border border-slate-200 focus:border-blue-400 text-slate-800 placeholder-slate-400 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors shadow-sm"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Tone */}
         <div className="mt-8">
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-            2 · Selecciona el tono de las respuestas
+            {professionReady ? "3" : "2"} · Selecciona el tono de las respuestas
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {TONE_OPTIONS.map((tone) => (
@@ -146,13 +198,14 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
           </div>
         </div>
 
-        {/* Continue button (for preset professions) */}
-        {selectedProfile && (
+        {/* Continue button */}
+        {canContinue && (
           <button
             onClick={handleContinue}
             className="mt-6 w-full bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-5 py-3 text-sm font-semibold transition-colors shadow-sm"
           >
-            Continuar como {selectedProfile.icon} {selectedProfile.label}
+            Continuar como {selectedProfile?.icon ?? "💼"}{" "}
+            {selectedProfile?.label ?? customProfession.trim()} · {sectorLabel}
           </button>
         )}
       </div>
