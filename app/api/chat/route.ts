@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { GLOSSARY_TERMS } from "@/lib/glossary";
 
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 export async function POST(req: NextRequest) {
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const { messages, profession, systemPromptContext, tonePrompt } = await req.json();
 
   if (!messages || !Array.isArray(messages)) {
