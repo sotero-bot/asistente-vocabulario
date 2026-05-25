@@ -39,6 +39,7 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
   // Returning user flow
   const [existingUser, setExistingUser] = useState<UserRecord | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupSettled, setLookupSettled] = useState(false);
   const [forceEdit, setForceEdit] = useState(false);
 
   const emailValid = EMAIL_RE.test(email.trim());
@@ -46,14 +47,18 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
   const sectorLabel = selectedSector?.label ?? customSector.trim();
   const canContinue = emailValid && professionReady && !!sectorLabel && !submitting;
 
-  // Lookup email when it becomes valid (debounced)
+  // Lookup email when it becomes valid (debounced).
+  // Bloquea los pasos siguientes hasta que termine — evita el flicker
+  // "selecciona profesión → de pronto aparece bienvenido de nuevo".
   useEffect(() => {
+    setLookupSettled(false);
     if (!emailValid) {
       setExistingUser(null);
+      setLookupLoading(false);
       return;
     }
+    setLookupLoading(true);
     const t = setTimeout(async () => {
-      setLookupLoading(true);
       try {
         const res = await fetch("/api/users/lookup", {
           method: "POST",
@@ -72,8 +77,9 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
       } catch {}
       finally {
         setLookupLoading(false);
+        setLookupSettled(true);
       }
-    }, 400);
+    }, 200);
     return () => clearTimeout(t);
   }, [email, emailValid]);
 
@@ -239,8 +245,11 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
           className="w-full bg-white border border-slate-200 focus:border-blue-400 text-slate-800 placeholder-slate-400 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors shadow-sm"
           autoComplete="email"
         />
-        {lookupLoading && (
-          <p className="mt-2 text-xs text-slate-400">Buscando tu cuenta...</p>
+        {emailValid && lookupLoading && (
+          <p className="mt-3 text-xs text-slate-500 flex items-center gap-2">
+            <span className="inline-block w-3 h-3 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+            Buscando tu cuenta...
+          </p>
         )}
 
         {/* Returning user welcome */}
@@ -289,7 +298,7 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
         })()}
 
         {/* Step 2: Profession */}
-        {emailValid && !showReturning && (
+        {emailValid && lookupSettled && !showReturning && (
           <div className="mt-8">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
               2 · Selecciona tu profesión
