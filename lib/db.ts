@@ -4,7 +4,20 @@ declare global {
   var __pgPool: Pool | undefined;
 }
 
-// Runtime usa el pooler (PgBouncer en Supabase). En local apunta a Postgres directo.
+// Forza sslmode=no-verify en URLs de Supabase. Sin esto, pg v8 trata sslmode=require
+// como verify-full y falla con "self-signed certificate in certificate chain"
+// (la cadena interna de Supabase incluye un cert auto-firmado).
+function patchSupabaseSsl(url: string): string {
+  if (!/supabase\.(co|com|net)/.test(url)) return url;
+  try {
+    const u = new URL(url);
+    u.searchParams.set("sslmode", "no-verify");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 function getConnectionString(): string {
   const url =
     process.env.POSTGRES_URL ||
@@ -15,15 +28,12 @@ function getConnectionString(): string {
       "POSTGRES_URL no está definida. Configúrala en .env.local (local) o en Vercel (Supabase auto-inyecta esta var)."
     );
   }
-  return url;
+  return patchSupabaseSsl(url);
 }
 
 function buildPool(): Pool {
-  const connectionString = getConnectionString();
-  const isSupabase = /supabase\.(co|com|net)/.test(connectionString);
   return new Pool({
-    connectionString,
-    ssl: isSupabase ? { rejectUnauthorized: false } : undefined,
+    connectionString: getConnectionString(),
     max: 5,
   });
 }

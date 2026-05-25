@@ -23,7 +23,7 @@ if (existsSync(envPath)) {
   }
 }
 
-const url =
+let url =
   process.env.POSTGRES_URL_NON_POOLING ||
   process.env.POSTGRES_URL ||
   process.env.DATABASE_URL;
@@ -36,10 +36,17 @@ if (!url) {
 }
 
 const isSupabase = /supabase\.(co|com|net)/.test(url);
-const client = new pg.Client({
-  connectionString: url,
-  ssl: isSupabase ? { rejectUnauthorized: false } : undefined,
-});
+
+// Forzar sslmode=no-verify en Supabase. Ver lib/db.ts para detalles.
+if (isSupabase) {
+  try {
+    const u = new URL(url);
+    u.searchParams.set("sslmode", "no-verify");
+    url = u.toString();
+  } catch {}
+}
+
+const client = new pg.Client({ connectionString: url });
 
 const schemaPath = resolve(projectRoot, "db/schema.sql");
 const sql = readFileSync(schemaPath, "utf8");
