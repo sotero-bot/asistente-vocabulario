@@ -1,13 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { GLOSSARY_TERMS } from "@/lib/glossary";
+import { db } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const { messages, profession, systemPromptContext, tonePrompt } = await req.json();
+  const {
+    messages,
+    profession,
+    systemPromptContext,
+    tonePrompt,
+    tone,
+    userId,
+    conversationId,
+    termClicked,
+  } = await req.json();
 
   if (!messages || !Array.isArray(messages)) {
     return NextResponse.json({ error: "Mensajes inválidos" }, { status: 400 });
+  }
+
+  // Resolve / create conversation when we have a userId
+  let activeConversationId: string | null = conversationId ?? null;
+  let userMessageId: string | null = null;
+  const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
+
+  if (userId) {
+    try {
+      if (!activeConversationId) {
+        const r = await db.query<{ id: string }>(
+          "insert into conversations (user_id) values ($1) returning id",
+          [userId]
+        );
+        activeConversationId = r.rows[0].id;
+      }
+      if (lastUserMessage?.content) {
+        const r = await db.query<{ id: string }>(
+          `insert into messages (conversation_id, role, content, tone, term_clicked)
+           values ($1, 'user', $2, $3, $4) returning id`,
+          [activeConversationId, lastUserMessage.content, tone ?? null, termClicked ?? null]
+        );
+        userMessageId = r.rows[0].id;
+      }
+    } catch (err) {
+      console.error("persist user message failed", err);
+    }
   }
 
   const glossaryIndex = GLOSSARY_TERMS.map(
@@ -53,14 +90,49 @@ Reglas importantes:
 
   const readable = new ReadableStream({
     async start(controller) {
-      for await (const chunk of stream) {
-        const text = chunk.choices[0]?.delta?.content ?? "";
-        if (text) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
+      let assistantText = "";
+      try {
+        for await (const chunk of stream) {
+          const text = chunk.choices[0]?.delta?.content ?? "";
+          if (text) {
+            assistantText += text;
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
+            );
+          }
         }
+
+        // Persist assistant message after streaming completes
+        let assistantMessageId: string | null = null;
+        if (userId && activeConversationId && assistantText) {
+          try {
+            const r = await db.query<{ id: string }>(
+              `insert into messages (conversation_id, role, content, tone)
+               values ($1, 'assistant', $2, $3) returning id`,
+              [activeConversationId, assistantText, tone ?? null]
+            );
+            assistantMessageId = r.rows[0].id;
+          } catch (err) {
+            console.error("persist assistant message failed", err);
+          }
+        }
+
+        // Emit meta (ids) before [DONE] so the client can attach them to the rendered message
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              meta: {
+                conversationId: activeConversationId,
+                userMessageId,
+                assistantMessageId,
+              },
+            })}\n\n`
+          )
+        );
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      } finally {
+        controller.close();
       }
-      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-      controller.close();
     },
   });
 

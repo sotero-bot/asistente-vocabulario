@@ -1,5 +1,27 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Variables de entorno
+
+Usamos los **mismos nombres que Vercel auto-inyecta** al integrar Supabase, así no hay lógica condicional entre entornos.
+
+- `OPENAI_API_KEY` — clave de OpenAI.
+- `POSTGRES_URL` — connection string usada en runtime (pooled en Supabase, directo en local).
+- `POSTGRES_URL_NON_POOLING` — usada por las migraciones (DDL puede fallar sobre PgBouncer).
+
+**Local:** copia `.env.example` a `.env.local` (ambas apuntan al mismo Postgres local).
+
+**Vercel:** al conectar el proyecto Supabase desde la integración, Vercel inyecta todas estas vars automáticamente. No hace falta añadirlas a mano (salvo `OPENAI_API_KEY`).
+
+## Inicializar base de datos
+
+Tablas: `users`, `conversations`, `messages`, `reports`. El schema vive en `db/schema.sql` y es idempotente — seguro re-ejecutar.
+
+```bash
+npm run db:migrate
+```
+
+En Vercel se ejecuta automáticamente en cada deploy (ver `build` en `package.json`).
+
 ## Getting Started
 
 First, run the development server:

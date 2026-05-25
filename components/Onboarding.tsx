@@ -5,19 +5,25 @@ import Image from "next/image";
 import { UserProfile, USER_PROFILES, ToneOption, TONE_OPTIONS, Sector, SECTORS } from "@/lib/glossary";
 
 interface OnboardingProps {
-  onSelect: (profile: UserProfile, tone: ToneOption) => void;
+  onSelect: (profile: UserProfile, tone: ToneOption, userId: string, email: string) => void;
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function Onboarding({ onSelect }: OnboardingProps) {
+  const [email, setEmail] = useState("");
   const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
   const [selectedTone, setSelectedTone] = useState<ToneOption>(TONE_OPTIONS[0]);
   const [customProfession, setCustomProfession] = useState("");
   const [selectedSector, setSelectedSector] = useState<Sector | null>(null);
   const [customSector, setCustomSector] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  const emailValid = EMAIL_RE.test(email.trim());
   const professionReady = !!(selectedProfile || customProfession.trim());
   const sectorLabel = selectedSector?.label ?? customSector.trim();
-  const canContinue = professionReady && !!sectorLabel;
+  const canContinue = emailValid && professionReady && !!sectorLabel && !submitting;
 
   const resetSector = () => {
     setSelectedSector(null);
@@ -43,9 +49,36 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
     };
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!canContinue) return;
-    onSelect(buildProfile(), selectedTone);
+    setSubmitting(true);
+    setError(null);
+    const profile = buildProfile();
+    const sectorVal = selectedSector?.label ?? customSector.trim();
+    try {
+      const res = await fetch("/api/users/identify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          profession: selectedProfile?.profession ?? "custom",
+          profession_label: selectedProfile?.label ?? customProfession.trim(),
+          custom_profession: selectedProfile ? null : customProfession.trim(),
+          sector: selectedSector?.id ?? null,
+          custom_sector: selectedSector ? null : sectorVal,
+          tone: selectedTone.id,
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || "No se pudo registrar el usuario");
+      }
+      const { user_id } = (await res.json()) as { user_id: string };
+      onSelect(profile, selectedTone, user_id, email.trim().toLowerCase());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error desconocido");
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -72,74 +105,95 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
             <p className="font-semibold text-slate-700 mb-1">Para comenzar, sigue estos pasos:</p>
             <p>
               <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold mr-2">1</span>
-              Selecciona tu profesión. Si no aparece en la lista, escríbela abajo.
+              Ingresa tu correo electrónico.
             </p>
             <p>
               <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold mr-2">2</span>
-              Selecciona el sector en el que trabajas.
+              Selecciona tu profesión. Si no aparece en la lista, escríbela abajo.
             </p>
             <p>
               <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold mr-2">3</span>
+              Selecciona el sector en el que trabajas.
+            </p>
+            <p>
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold mr-2">4</span>
               Selecciona el tono que quieres en las respuestas{" "}
               <span className="text-slate-400">(puedes cambiarlo después)</span>.
             </p>
           </div>
         </div>
 
-        {/* Step 1: Profession */}
+        {/* Step 1: Email */}
         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-          1 · Selecciona tu profesión
+          1 · Tu correo electrónico
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {USER_PROFILES.map((profile) => (
-            <button
-              key={profile.profession}
-              onClick={() => { setSelectedProfile(profile); setCustomProfession(""); resetSector(); }}
-              className={`flex items-center gap-4 p-4 border rounded-xl transition-all duration-200 text-left shadow-sm ${
-                selectedProfile?.profession === profile.profession
-                  ? "bg-blue-50 border-blue-500 ring-2 ring-blue-200"
-                  : "bg-white hover:bg-blue-50 border-slate-200 hover:border-blue-400"
-              }`}
-            >
-              <span className="text-3xl">{profile.icon}</span>
-              <span
-                className={`font-medium transition-colors ${
-                  selectedProfile?.profession === profile.profession
-                    ? "text-blue-700"
-                    : "text-slate-700"
-                }`}
-              >
-                {profile.label}
-              </span>
-              {selectedProfile?.profession === profile.profession && (
-                <span className="ml-auto text-blue-600 text-lg">✓</span>
-              )}
-            </button>
-          ))}
-        </div>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="tu@correo.com"
+          className="w-full bg-white border border-slate-200 focus:border-blue-400 text-slate-800 placeholder-slate-400 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors shadow-sm"
+          autoComplete="email"
+        />
 
-        {/* Custom profession */}
-        <div className="mt-4">
-          <p className="text-slate-400 text-sm text-center mb-3">
-            ¿Tu profesión no aparece? Escríbela aquí
-          </p>
-          <input
-            type="text"
-            value={customProfession}
-            onChange={(e) => {
-              setCustomProfession(e.target.value);
-              if (e.target.value.trim()) { setSelectedProfile(null); resetSector(); }
-            }}
-            placeholder="Ej: Arquitecto, Periodista, Chef..."
-            className="w-full bg-white border border-slate-200 focus:border-blue-400 text-slate-800 placeholder-slate-400 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors shadow-sm"
-          />
-        </div>
-
-        {/* Step 2: Sector (appears once profession is ready) */}
-        {professionReady && (
+        {/* Step 2: Profession */}
+        {emailValid && (
           <div className="mt-8">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              2 · Selecciona tu sector
+              2 · Selecciona tu profesión
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {USER_PROFILES.map((profile) => (
+                <button
+                  key={profile.profession}
+                  onClick={() => { setSelectedProfile(profile); setCustomProfession(""); resetSector(); }}
+                  className={`flex items-center gap-4 p-4 border rounded-xl transition-all duration-200 text-left shadow-sm ${
+                    selectedProfile?.profession === profile.profession
+                      ? "bg-blue-50 border-blue-500 ring-2 ring-blue-200"
+                      : "bg-white hover:bg-blue-50 border-slate-200 hover:border-blue-400"
+                  }`}
+                >
+                  <span className="text-3xl">{profile.icon}</span>
+                  <span
+                    className={`font-medium transition-colors ${
+                      selectedProfile?.profession === profile.profession
+                        ? "text-blue-700"
+                        : "text-slate-700"
+                    }`}
+                  >
+                    {profile.label}
+                  </span>
+                  {selectedProfile?.profession === profile.profession && (
+                    <span className="ml-auto text-blue-600 text-lg">✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom profession */}
+            <div className="mt-4">
+              <p className="text-slate-400 text-sm text-center mb-3">
+                ¿Tu profesión no aparece? Escríbela aquí
+              </p>
+              <input
+                type="text"
+                value={customProfession}
+                onChange={(e) => {
+                  setCustomProfession(e.target.value);
+                  if (e.target.value.trim()) { setSelectedProfile(null); resetSector(); }
+                }}
+                placeholder="Ej: Arquitecto, Periodista, Chef..."
+                className="w-full bg-white border border-slate-200 focus:border-blue-400 text-slate-800 placeholder-slate-400 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors shadow-sm"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Sector */}
+        {emailValid && professionReady && (
+          <div className="mt-8">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              3 · Selecciona tu sector
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {SECTORS.map((sector) => (
@@ -175,37 +229,47 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
           </div>
         )}
 
-        {/* Step 3: Tone */}
-        <div className="mt-8">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-            {professionReady ? "3" : "2"} · Selecciona el tono de las respuestas
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {TONE_OPTIONS.map((tone) => (
-              <button
-                key={tone.id}
-                onClick={() => setSelectedTone(tone)}
-                className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
-                  selectedTone.id === tone.id
-                    ? "bg-blue-600 border-blue-600 text-white shadow-sm"
-                    : "bg-white border-slate-200 text-slate-600 hover:border-blue-400 hover:bg-blue-50"
-                }`}
-              >
-                <span>{tone.icon}</span>
-                <span>{tone.label}</span>
-              </button>
-            ))}
+        {/* Step 4: Tone */}
+        {emailValid && professionReady && (
+          <div className="mt-8">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              4 · Selecciona el tono de las respuestas
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {TONE_OPTIONS.map((tone) => (
+                <button
+                  key={tone.id}
+                  onClick={() => setSelectedTone(tone)}
+                  className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-all ${
+                    selectedTone.id === tone.id
+                      ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                      : "bg-white border-slate-200 text-slate-600 hover:border-blue-400 hover:bg-blue-50"
+                  }`}
+                >
+                  <span>{tone.icon}</span>
+                  <span>{tone.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {error && (
+          <p className="mt-4 text-sm text-red-600 text-center">{error}</p>
+        )}
 
         {/* Continue button */}
         {canContinue && (
           <button
             onClick={handleContinue}
-            className="mt-6 w-full bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-5 py-3 text-sm font-semibold transition-colors shadow-sm"
+            disabled={submitting}
+            className="mt-6 w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white rounded-xl px-5 py-3 text-sm font-semibold transition-colors shadow-sm"
           >
-            Continuar como {selectedProfile?.icon ?? "💼"}{" "}
-            {selectedProfile?.label ?? customProfession.trim()} · {sectorLabel}
+            {submitting
+              ? "Registrando..."
+              : `Continuar como ${selectedProfile?.icon ?? "💼"} ${
+                  selectedProfile?.label ?? customProfession.trim()
+                } · ${sectorLabel}`}
           </button>
         )}
       </div>

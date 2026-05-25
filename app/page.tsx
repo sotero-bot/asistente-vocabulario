@@ -9,18 +9,29 @@ import dynamic from "next/dynamic";
 const TourGuide = dynamic(() => import("@/components/TourGuide"), { ssr: false });
 import { GlossaryTerm, UserProfile, ToneOption, TONE_OPTIONS, GLOSSARY_TERMS } from "@/lib/glossary";
 
+const USER_ID_KEY = "glosario_user_id";
+const USER_EMAIL_KEY = "glosario_user_email";
+
 export default function Home() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [initialTone, setInitialTone] = useState<ToneOption>(TONE_OPTIONS[0]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [pendingTerm, setPendingTerm] = useState<GlossaryTerm | null>(null);
   const [activeView, setActiveView] = useState<"glossary" | "chat">("glossary");
 
-  if (!profile) {
+  if (!profile || !userId) {
     return (
       <Onboarding
-        onSelect={(p, tone) => {
+        onSelect={(p, tone, uid, email) => {
           setProfile(p);
           setInitialTone(tone);
+          setUserId(uid);
+          setUserEmail(email);
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(USER_ID_KEY, uid);
+            window.localStorage.setItem(USER_EMAIL_KEY, email);
+          }
         }}
       />
     );
@@ -29,6 +40,16 @@ export default function Home() {
   const handleTermClick = (term: GlossaryTerm) => {
     setPendingTerm(term);
     setActiveView("chat");
+  };
+
+  const handleReset = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(USER_ID_KEY);
+      window.localStorage.removeItem(USER_EMAIL_KEY);
+    }
+    setProfile(null);
+    setUserId(null);
+    setUserEmail(null);
   };
 
   return (
@@ -48,8 +69,11 @@ export default function Home() {
           <span className="text-slate-500 text-sm hidden sm:inline">
             {profile.icon} {profile.label}
           </span>
+          {userEmail && (
+            <span className="text-slate-400 text-xs hidden md:inline">{userEmail}</span>
+          )}
           <button
-            onClick={() => setProfile(null)}
+            onClick={handleReset}
             className="text-slate-400 hover:text-blue-600 text-xs underline transition-colors"
           >
             Cambiar perfil
@@ -97,6 +121,7 @@ export default function Home() {
             <ChatPanel
               profile={profile}
               initialTone={initialTone}
+              userId={userId}
               pendingTerm={pendingTerm}
               onTermConsumed={() => setPendingTerm(null)}
             />
@@ -111,6 +136,7 @@ export default function Home() {
             <ChatPanel
               profile={profile}
               initialTone={initialTone}
+              userId={userId}
               pendingTerm={pendingTerm}
               onTermConsumed={() => setPendingTerm(null)}
             />

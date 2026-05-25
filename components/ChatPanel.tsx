@@ -6,16 +6,25 @@ import { GlossaryTerm, UserProfile, ToneOption, TONE_OPTIONS } from "@/lib/gloss
 interface Message {
   role: "user" | "assistant";
   content: string;
+  messageId?: string | null;
 }
 
 interface ChatPanelProps {
   profile: UserProfile;
   initialTone: ToneOption;
+  userId: string;
   pendingTerm: GlossaryTerm | null;
   onTermConsumed: () => void;
 }
 
-export default function ChatPanel({ profile, initialTone, pendingTerm, onTermConsumed }: ChatPanelProps) {
+const REPORT_REASONS = [
+  { id: "incorrecto", label: "Información incorrecta" },
+  { id: "no_responde", label: "No responde a mi pregunta" },
+  { id: "tono", label: "Tono inadecuado" },
+  { id: "otro", label: "Otro" },
+];
+
+export default function ChatPanel({ profile, initialTone, userId, pendingTerm, onTermConsumed }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -25,6 +34,12 @@ export default function ChatPanel({ profile, initialTone, pendingTerm, onTermCon
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeTone, setActiveTone] = useState(initialTone);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [reportFor, setReportFor] = useState<{ index: number; messageId: string | null } | null>(null);
+  const [reportReason, setReportReason] = useState<string>(REPORT_REASONS[0].id);
+  const [reportComment, setReportComment] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportedIndices, setReportedIndices] = useState<Set<number>>(new Set());
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -33,7 +48,7 @@ export default function ChatPanel({ profile, initialTone, pendingTerm, onTermCon
   }, [messages, loading]);
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, termClicked?: string) => {
       if (!text.trim() || loading) return;
 
       const userMessage: Message = { role: "user", content: text };
@@ -50,10 +65,14 @@ export default function ChatPanel({ profile, initialTone, pendingTerm, onTermCon
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            messages: updatedMessages,
+            messages: updatedMessages.map(({ role, content }) => ({ role, content })),
             profession: profile.profession,
             systemPromptContext: profile.systemPromptContext,
             tonePrompt: activeTone.prompt,
+            tone: activeTone.id,
+            userId,
+            conversationId,
+            termClicked: termClicked ?? null,
           }),
         });
 
@@ -76,15 +95,30 @@ export default function ChatPanel({ profile, initialTone, pendingTerm, onTermCon
               const data = line.slice(6);
               if (data === "[DONE]") break;
               try {
-                const { text } = JSON.parse(data);
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  updated[updated.length - 1] = {
-                    role: "assistant",
-                    content: updated[updated.length - 1].content + text,
-                  };
-                  return updated;
-                });
+                const parsed = JSON.parse(data);
+                if (parsed.text) {
+                  setMessages((prev) => {
+                    const updated = [...prev];
+                    updated[updated.length - 1] = {
+                      role: "assistant",
+                      content: updated[updated.length - 1].content + parsed.text,
+                    };
+                    return updated;
+                  });
+                } else if (parsed.meta) {
+                  if (parsed.meta.conversationId) {
+                    setConversationId(parsed.meta.conversationId);
+                  }
+                  const assistantMessageId: string | null = parsed.meta.assistantMessageId ?? null;
+                  setMessages((prev) => {
+                    const updated = [...prev];
+                    updated[updated.length - 1] = {
+                      ...updated[updated.length - 1],
+                      messageId: assistantMessageId,
+                    };
+                    return updated;
+                  });
+                }
               } catch {}
             }
           }
@@ -103,13 +137,14 @@ export default function ChatPanel({ profile, initialTone, pendingTerm, onTermCon
         inputRef.current?.focus();
       }
     },
-    [messages, loading, profile, activeTone]
+    [messages, loading, profile, activeTone, userId, conversationId]
   );
 
   useEffect(() => {
     if (pendingTerm) {
       sendMessage(
-        `Explícame el término "${pendingTerm.term}" con un ejemplo práctico para mi área de trabajo.`
+        `Explícame el término "${pendingTerm.term}" con un ejemplo práctico para mi área de trabajo.`,
+        pendingTerm.term
       );
       onTermConsumed();
     }
@@ -124,6 +159,32 @@ export default function ChatPanel({ profile, initialTone, pendingTerm, onTermCon
     return content
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\n/g, "<br/>");
+  };
+
+  const submitReport = async () => {
+    if (!reportFor) return;
+    setReportSubmitting(true);
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          messageId: reportFor.messageId,
+          reason: reportReason,
+          userComment: reportComment.trim() || null,
+        }),
+      });
+      if (res.ok) {
+        setReportedIndices((s) => new Set(s).add(reportFor.index));
+      }
+    } catch {}
+    finally {
+      setReportSubmitting(false);
+      setReportFor(null);
+      setReportReason(REPORT_REASONS[0].id);
+      setReportComment("");
+    }
   };
 
   return (
@@ -146,14 +207,16 @@ export default function ChatPanel({ profile, initialTone, pendingTerm, onTermCon
           </button>
         ))}
         <button
-          onClick={() =>
+          onClick={() => {
             setMessages([
               {
                 role: "assistant",
                 content: `Hola ${profile.icon} Chat reiniciado. ¿En qué puedo ayudarte?`,
               },
-            ])
-          }
+            ]);
+            setConversationId(null);
+            setReportedIndices(new Set());
+          }}
           className="ml-auto shrink-0 text-slate-400 hover:text-blue-600 text-xs transition-colors"
           title="Reiniciar chat"
         >
@@ -164,14 +227,33 @@ export default function ChatPanel({ profile, initialTone, pendingTerm, onTermCon
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
-                msg.role === "user"
-                  ? "bg-blue-600 text-white rounded-br-sm"
-                  : "bg-white text-slate-700 rounded-bl-sm border border-slate-100"
-              }`}
-              dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }}
-            />
+            <div className="flex flex-col max-w-[85%]">
+              <div
+                className={`rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
+                  msg.role === "user"
+                    ? "bg-blue-600 text-white rounded-br-sm"
+                    : "bg-white text-slate-700 rounded-bl-sm border border-slate-100"
+                }`}
+                dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }}
+              />
+              {msg.role === "assistant" && i > 0 && msg.content && !loading && (
+                <div className="flex justify-start mt-1 px-1">
+                  {reportedIndices.has(i) ? (
+                    <span className="text-[10px] text-emerald-600">✓ Reporte enviado</span>
+                  ) : (
+                    <button
+                      onClick={() =>
+                        setReportFor({ index: i, messageId: msg.messageId ?? null })
+                      }
+                      className="text-[10px] text-slate-400 hover:text-red-600 transition-colors"
+                      title="Reportar respuesta"
+                    >
+                      🚩 Reportar
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         ))}
         {loading && messages[messages.length - 1]?.content === "" && (
@@ -206,6 +288,66 @@ export default function ChatPanel({ profile, initialTone, pendingTerm, onTermCon
           Enviar
         </button>
       </form>
+
+      {/* Report modal */}
+      {reportFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-5">
+            <h3 className="text-base font-semibold text-slate-800 mb-1">Reportar respuesta</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Tu reporte nos ayuda a mejorar las respuestas del asistente.
+            </p>
+
+            <div className="space-y-2 mb-4">
+              {REPORT_REASONS.map((r) => (
+                <label
+                  key={r.id}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-sm transition-colors ${
+                    reportReason === r.id
+                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                      : "border-slate-200 hover:bg-slate-50 text-slate-600"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="reason"
+                    value={r.id}
+                    checked={reportReason === r.id}
+                    onChange={(e) => setReportReason(e.target.value)}
+                    className="accent-blue-600"
+                  />
+                  {r.label}
+                </label>
+              ))}
+            </div>
+
+            <textarea
+              value={reportComment}
+              onChange={(e) => setReportComment(e.target.value)}
+              placeholder="¿Algo más que quieras comentar? (opcional)"
+              rows={3}
+              className="w-full bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 mb-4"
+            />
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setReportFor(null)}
+                disabled={reportSubmitting}
+                className="px-4 py-2 text-sm text-slate-500 hover:text-slate-700"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={submitReport}
+                disabled={reportSubmitting}
+                className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white rounded-lg font-medium"
+              >
+                {reportSubmitting ? "Enviando..." : "Enviar reporte"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
