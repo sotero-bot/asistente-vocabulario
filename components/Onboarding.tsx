@@ -1,11 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { UserProfile, USER_PROFILES, ToneOption, TONE_OPTIONS, Sector, SECTORS } from "@/lib/glossary";
+import { buildProfileFromRecord, UserRecord } from "@/lib/profile";
+
+export interface InitialMessage {
+  message_id: string;
+  role: "user" | "assistant";
+  content: string;
+}
+
+interface OnboardingSelection {
+  profile: UserProfile;
+  tone: ToneOption;
+  userId: string;
+  email: string;
+  conversationId: string | null;
+  initialMessages: InitialMessage[];
+}
 
 interface OnboardingProps {
-  onSelect: (profile: UserProfile, tone: ToneOption, userId: string, email: string) => void;
+  onSelect: (selection: OnboardingSelection) => void;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -20,10 +36,46 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Returning user flow
+  const [existingUser, setExistingUser] = useState<UserRecord | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [forceEdit, setForceEdit] = useState(false);
+
   const emailValid = EMAIL_RE.test(email.trim());
   const professionReady = !!(selectedProfile || customProfession.trim());
   const sectorLabel = selectedSector?.label ?? customSector.trim();
   const canContinue = emailValid && professionReady && !!sectorLabel && !submitting;
+
+  // Lookup email when it becomes valid (debounced)
+  useEffect(() => {
+    if (!emailValid) {
+      setExistingUser(null);
+      return;
+    }
+    const t = setTimeout(async () => {
+      setLookupLoading(true);
+      try {
+        const res = await fetch("/api/users/lookup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.found) {
+            setExistingUser(data.user as UserRecord);
+            setForceEdit(false);
+          } else {
+            setExistingUser(null);
+          }
+        }
+      } catch {}
+      finally {
+        setLookupLoading(false);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [email, emailValid]);
 
   const resetSector = () => {
     setSelectedSector(null);
@@ -47,6 +99,53 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
       icon: "💼",
       systemPromptContext: `El usuario trabaja como ${name} en el sector de ${sector}. Adapta tus explicaciones y ejemplos a ese contexto específico. Usa casos de uso, flujos de trabajo y terminología relevante para un ${name} en el sector de ${sector}. Relaciona los conceptos de IA con aplicaciones prácticas que le serían útiles en su día a día.`,
     };
+  };
+
+  const loadHistoryAndFinish = async (
+    profile: UserProfile,
+    tone: ToneOption,
+    userId: string
+  ) => {
+    let conversationId: string | null = null;
+    let initialMessages: InitialMessage[] = [];
+    try {
+      const res = await fetch("/api/conversations/latest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.found) {
+          conversationId = data.conversation_id;
+          initialMessages = data.messages;
+        }
+      }
+    } catch {}
+    onSelect({
+      profile,
+      tone,
+      userId,
+      email: email.trim().toLowerCase(),
+      conversationId,
+      initialMessages,
+    });
+  };
+
+  const handleContinueExisting = async () => {
+    if (!existingUser) return;
+    setSubmitting(true);
+    setError(null);
+    const { profile, tone } = buildProfileFromRecord(existingUser);
+    // touch last_seen_at
+    try {
+      await fetch("/api/users/identify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+    } catch {}
+    await loadHistoryAndFinish(profile, tone, existingUser.user_id);
   };
 
   const handleContinue = async () => {
@@ -74,12 +173,15 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
         throw new Error(j.error || "No se pudo registrar el usuario");
       }
       const { user_id } = (await res.json()) as { user_id: string };
-      onSelect(profile, selectedTone, user_id, email.trim().toLowerCase());
+      await loadHistoryAndFinish(profile, selectedTone, user_id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error desconocido");
       setSubmitting(false);
     }
   };
+
+  // Returning user view: skip profession/sector/tone
+  const showReturning = existingUser && !forceEdit;
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-6">
@@ -101,26 +203,28 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
             Inteligencia Artificial y Agentes, aterrizado a tu mercado con ejemplos reales de tu
             profesión.
           </p>
-          <div className="mt-5 text-left inline-block bg-slate-50 border border-slate-200 rounded-xl px-6 py-4 text-sm text-slate-600 space-y-2">
-            <p className="font-semibold text-slate-700 mb-1">Para comenzar, sigue estos pasos:</p>
-            <p>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold mr-2">1</span>
-              Ingresa tu correo electrónico.
-            </p>
-            <p>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold mr-2">2</span>
-              Selecciona tu profesión. Si no aparece en la lista, escríbela abajo.
-            </p>
-            <p>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold mr-2">3</span>
-              Selecciona el sector en el que trabajas.
-            </p>
-            <p>
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold mr-2">4</span>
-              Selecciona el tono que quieres en las respuestas{" "}
-              <span className="text-slate-400">(puedes cambiarlo después)</span>.
-            </p>
-          </div>
+          {!showReturning && (
+            <div className="mt-5 text-left inline-block bg-slate-50 border border-slate-200 rounded-xl px-6 py-4 text-sm text-slate-600 space-y-2">
+              <p className="font-semibold text-slate-700 mb-1">Para comenzar, sigue estos pasos:</p>
+              <p>
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold mr-2">1</span>
+                Ingresa tu correo electrónico.
+              </p>
+              <p>
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold mr-2">2</span>
+                Selecciona tu profesión. Si no aparece en la lista, escríbela abajo.
+              </p>
+              <p>
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold mr-2">3</span>
+                Selecciona el sector en el que trabajas.
+              </p>
+              <p>
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold mr-2">4</span>
+                Selecciona el tono que quieres en las respuestas{" "}
+                <span className="text-slate-400">(puedes cambiarlo después)</span>.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Step 1: Email */}
@@ -135,9 +239,57 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
           className="w-full bg-white border border-slate-200 focus:border-blue-400 text-slate-800 placeholder-slate-400 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 transition-colors shadow-sm"
           autoComplete="email"
         />
+        {lookupLoading && (
+          <p className="mt-2 text-xs text-slate-400">Buscando tu cuenta...</p>
+        )}
+
+        {/* Returning user welcome */}
+        {showReturning && (() => {
+          const { profile: rebuilt, tone: rebuiltTone, sectorLabel: secLabel } =
+            buildProfileFromRecord(existingUser);
+          return (
+            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-2xl p-5">
+              <p className="text-sm font-semibold text-blue-800 mb-2">
+                👋 ¡Hola de nuevo!
+              </p>
+              <p className="text-sm text-slate-700 mb-1">
+                Te recordamos como:
+              </p>
+              <p className="text-sm text-slate-800 mb-3">
+                <span className="mr-1">{rebuilt.icon}</span>
+                <span className="font-medium">{rebuilt.label}</span>
+                {secLabel && !rebuilt.label.includes(secLabel) && (
+                  <span className="text-slate-500"> · {secLabel}</span>
+                )}
+                <span className="text-slate-500">
+                  {" · "}Tono {rebuiltTone.icon} {rebuiltTone.label}
+                </span>
+              </p>
+              <p className="text-xs text-slate-500 mb-4">
+                Cargaremos tu última conversación para que sigas donde la dejaste.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={handleContinueExisting}
+                  disabled={submitting}
+                  className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors shadow-sm"
+                >
+                  {submitting ? "Cargando..." : "Continuar con mi perfil"}
+                </button>
+                <button
+                  onClick={() => setForceEdit(true)}
+                  disabled={submitting}
+                  className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors"
+                >
+                  Editar perfil
+                </button>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Step 2: Profession */}
-        {emailValid && (
+        {emailValid && !showReturning && (
           <div className="mt-8">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
               2 · Selecciona tu profesión
@@ -190,7 +342,7 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
         )}
 
         {/* Step 3: Sector */}
-        {emailValid && professionReady && (
+        {emailValid && !showReturning && professionReady && (
           <div className="mt-8">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
               3 · Selecciona tu sector
@@ -230,7 +382,7 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
         )}
 
         {/* Step 4: Tone */}
-        {emailValid && professionReady && (
+        {emailValid && !showReturning && professionReady && (
           <div className="mt-8">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
               4 · Selecciona el tono de las respuestas
@@ -258,8 +410,8 @@ export default function Onboarding({ onSelect }: OnboardingProps) {
           <p className="mt-4 text-sm text-red-600 text-center">{error}</p>
         )}
 
-        {/* Continue button */}
-        {canContinue && (
+        {/* Continue button for new users / editing flow */}
+        {!showReturning && canContinue && (
           <button
             onClick={handleContinue}
             disabled={submitting}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import Onboarding from "@/components/Onboarding";
+import Onboarding, { InitialMessage } from "@/components/Onboarding";
 import GlossaryPanel from "@/components/GlossaryPanel";
 import ChatPanel from "@/components/ChatPanel";
 import dynamic from "next/dynamic";
@@ -17,20 +17,24 @@ export default function Home() {
   const [initialTone, setInitialTone] = useState<ToneOption>(TONE_OPTIONS[0]);
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [initialMessages, setInitialMessages] = useState<InitialMessage[]>([]);
   const [pendingTerm, setPendingTerm] = useState<GlossaryTerm | null>(null);
   const [activeView, setActiveView] = useState<"glossary" | "chat">("glossary");
 
   if (!profile || !userId) {
     return (
       <Onboarding
-        onSelect={(p, tone, uid, email) => {
-          setProfile(p);
-          setInitialTone(tone);
-          setUserId(uid);
-          setUserEmail(email);
+        onSelect={(s) => {
+          setProfile(s.profile);
+          setInitialTone(s.tone);
+          setUserId(s.userId);
+          setUserEmail(s.email);
+          setConversationId(s.conversationId);
+          setInitialMessages(s.initialMessages);
           if (typeof window !== "undefined") {
-            window.localStorage.setItem(USER_ID_KEY, uid);
-            window.localStorage.setItem(USER_EMAIL_KEY, email);
+            window.localStorage.setItem(USER_ID_KEY, s.userId);
+            window.localStorage.setItem(USER_EMAIL_KEY, s.email);
           }
         }}
       />
@@ -50,6 +54,8 @@ export default function Home() {
     setProfile(null);
     setUserId(null);
     setUserEmail(null);
+    setConversationId(null);
+    setInitialMessages([]);
   };
 
   return (
@@ -122,6 +128,8 @@ export default function Home() {
               profile={profile}
               initialTone={initialTone}
               userId={userId}
+              initialConversationId={conversationId}
+              initialMessages={initialMessages}
               pendingTerm={pendingTerm}
               onTermConsumed={() => setPendingTerm(null)}
             />
@@ -137,6 +145,8 @@ export default function Home() {
               profile={profile}
               initialTone={initialTone}
               userId={userId}
+              initialConversationId={conversationId}
+              initialMessages={initialMessages}
               pendingTerm={pendingTerm}
               onTermConsumed={() => setPendingTerm(null)}
             />

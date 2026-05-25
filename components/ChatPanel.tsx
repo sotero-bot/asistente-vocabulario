@@ -9,10 +9,18 @@ interface Message {
   messageId?: string | null;
 }
 
+interface InitialMessageDTO {
+  message_id: string;
+  role: "user" | "assistant";
+  content: string;
+}
+
 interface ChatPanelProps {
   profile: UserProfile;
   initialTone: ToneOption;
   userId: string;
+  initialConversationId?: string | null;
+  initialMessages?: InitialMessageDTO[];
   pendingTerm: GlossaryTerm | null;
   onTermConsumed: () => void;
 }
@@ -24,17 +32,38 @@ const REPORT_REASONS = [
   { id: "otro", label: "Otro" },
 ];
 
-export default function ChatPanel({ profile, initialTone, userId, pendingTerm, onTermConsumed }: ChatPanelProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: `Hola ${profile.icon} ¡Bienvenido! Estoy aquí para explicarte conceptos de IA adaptados a tu contexto como **${profile.label}**.\n\nPuedes hacer clic en cualquier término del glosario para que te lo explique con ejemplos de tu área, o simplemente preguntarme lo que necesites.`,
-    },
-  ]);
+const defaultWelcome = (profile: UserProfile): Message => ({
+  role: "assistant",
+  content: `Hola ${profile.icon} ¡Bienvenido! Estoy aquí para explicarte conceptos de IA adaptados a tu contexto como **${profile.label}**.\n\nPuedes hacer clic en cualquier término del glosario para que te lo explique con ejemplos de tu área, o simplemente preguntarme lo que necesites.`,
+});
+
+const hydrateMessages = (incoming: InitialMessageDTO[] | undefined, profile: UserProfile): Message[] => {
+  if (!incoming || incoming.length === 0) return [defaultWelcome(profile)];
+  return incoming.map((m) => ({
+    role: m.role,
+    content: m.content,
+    messageId: m.message_id,
+  }));
+};
+
+export default function ChatPanel({
+  profile,
+  initialTone,
+  userId,
+  initialConversationId,
+  initialMessages,
+  pendingTerm,
+  onTermConsumed,
+}: ChatPanelProps) {
+  const [messages, setMessages] = useState<Message[]>(() =>
+    hydrateMessages(initialMessages, profile)
+  );
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeTone, setActiveTone] = useState(initialTone);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(
+    initialConversationId ?? null
+  );
   const [reportFor, setReportFor] = useState<{ index: number; messageId: string | null } | null>(null);
   const [reportReason, setReportReason] = useState<string>(REPORT_REASONS[0].id);
   const [reportComment, setReportComment] = useState("");
