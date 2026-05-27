@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isAdmin } from "@/lib/admin";
@@ -10,6 +11,7 @@ interface AdminUserRow {
   email: string;
   profession_label: string | null;
   active: boolean;
+  has_password: boolean;
   created_at: string;
   last_seen_at: string;
 }
@@ -17,12 +19,22 @@ interface AdminUserRow {
 async function toggleActive(formData: FormData) {
   "use server";
   const session = await auth();
-  if (!isAdmin(session?.user?.email)) {
-    throw new Error("No autorizado");
-  }
+  if (!isAdmin(session?.user?.email)) throw new Error("No autorizado");
   const id = formData.get("id") as string;
   const next = formData.get("next") === "true";
   await db.query("update users set active = $1 where id = $2", [next, id]);
+  revalidatePath("/admin");
+}
+
+async function setPassword(formData: FormData) {
+  "use server";
+  const session = await auth();
+  if (!isAdmin(session?.user?.email)) throw new Error("No autorizado");
+  const id = formData.get("id") as string;
+  const password = (formData.get("password") as string | null)?.trim();
+  if (!password || password.length < 6) return;
+  const hash = await bcrypt.hash(password, 12);
+  await db.query("update users set password_hash = $1 where id = $2", [hash, id]);
   revalidatePath("/admin");
 }
 
@@ -32,7 +44,9 @@ export default async function AdminPage() {
   if (!isAdmin(session.user.email)) redirect("/");
 
   const res = await db.query<AdminUserRow>(
-    `select id, email, profession_label, active, created_at, last_seen_at
+    `select id, email, profession_label, active,
+            (password_hash is not null) as has_password,
+            created_at, last_seen_at
        from users
       order by created_at desc`
   );
@@ -43,12 +57,12 @@ export default async function AdminPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-xl font-bold text-slate-800">Administración de usuarios</h1>
             <p className="text-sm text-slate-500">
-              {users.length} usuario{users.length === 1 ? "" : "s"} · activa o desactiva el acceso al chat
+              {users.length} usuario{users.length === 1 ? "" : "s"} · gestiona acceso y contraseñas
             </p>
           </div>
           <form action={logout}>
@@ -67,7 +81,8 @@ export default async function AdminPage() {
                 <th className="px-4 py-3 font-semibold">Registro</th>
                 <th className="px-4 py-3 font-semibold">Última actividad</th>
                 <th className="px-4 py-3 font-semibold">Estado</th>
-                <th className="px-4 py-3 font-semibold text-right">Acción</th>
+                <th className="px-4 py-3 font-semibold">Contraseña</th>
+                <th className="px-4 py-3 font-semibold text-right">Acceso</th>
               </tr>
             </thead>
             <tbody>
@@ -87,6 +102,24 @@ export default async function AdminPage() {
                         ● Inactivo
                       </span>
                     )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <form action={setPassword} className="flex items-center gap-1.5">
+                      <input type="hidden" name="id" value={u.id} />
+                      <input
+                        type="password"
+                        name="password"
+                        placeholder={u.has_password ? "••••••••" : "Sin contraseña"}
+                        minLength={6}
+                        className="w-32 px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder:text-slate-300"
+                      />
+                      <button
+                        type="submit"
+                        className="px-2 py-1 text-xs bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-600 rounded-lg transition-colors"
+                      >
+                        Guardar
+                      </button>
+                    </form>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <form action={toggleActive}>
