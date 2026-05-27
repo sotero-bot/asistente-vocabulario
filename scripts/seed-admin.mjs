@@ -1,8 +1,8 @@
 // Siembra el usuario administrador automáticamente (sin parámetros externos).
 // Corre en cada build (ver "build" en package.json), también en Vercel.
 //
-// Email fijo: sotero@danalyticspro.co
-// Password: ADMIN_PASSWORD (env) — si no está definida usa el valor por defecto.
+// ADMIN_USERNAME  (opcional, default "admin")
+// ADMIN_PASSWORD  (opcional, default "Danalytics2025!") — cámbialo en Vercel env vars.
 //
 // Es idempotente: crea o actualiza el admin en cada deploy.
 
@@ -26,8 +26,7 @@ if (existsSync(envPath)) {
   }
 }
 
-// Datos del administrador — email fijo, password configurable por env.
-const ADMIN_EMAIL = "sotero@danalyticspro.co";
+const username = (process.env.ADMIN_USERNAME || "admin").trim().toLowerCase();
 const password = process.env.ADMIN_PASSWORD || "Danalytics2025!";
 
 let url =
@@ -59,9 +58,24 @@ try {
      on conflict (email) do update set
        password_hash = excluded.password_hash,
        active        = true`,
-    [ADMIN_EMAIL, hash]
+    [username, hash]
   );
-  console.log(`[seed-admin] Admin "${ADMIN_EMAIL}" listo (activo).`);
+  console.log(`[seed-admin] Admin "${username}" listo (activo).`);
+
+  // Solo en local: usuario de prueba con email real.
+  if (!process.env.VERCEL) {
+    const testEmail = "sotero@danalyticspro.co";
+    const testHash = await bcrypt.hash("123", 12);
+    await client.query(
+      `insert into users (email, password_hash, active)
+       values ($1, $2, true)
+       on conflict (email) do update set
+         password_hash = excluded.password_hash,
+         active        = true`,
+      [testEmail, testHash]
+    );
+    console.log(`[seed-admin] Usuario de prueba "${testEmail}" listo (solo local).`);
+  }
 } catch (err) {
   console.error("[seed-admin] Error:", err.message);
   process.exit(1);
