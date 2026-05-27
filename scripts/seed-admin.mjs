@@ -1,11 +1,10 @@
-// Siembra el usuario administrador automáticamente (sin parámetros).
+// Siembra el usuario administrador automáticamente (sin parámetros externos).
 // Corre en cada build (ver "build" en package.json), también en Vercel.
-// Lee la config de variables de entorno, no de argumentos:
-//   ADMIN_USERNAME  (opcional, default "admin")
-//   ADMIN_PASSWORD  (requerido para sembrar; si falta, se omite sin fallar)
 //
-// Es idempotente: crea el admin si no existe y deja su contraseña/estado
-// alineados con las env vars en cada deploy.
+// Email fijo: sotero@danalyticspro.co
+// Password: ADMIN_PASSWORD (env) — si no está definida usa el valor por defecto.
+//
+// Es idempotente: crea o actualiza el admin en cada deploy.
 
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -27,22 +26,20 @@ if (existsSync(envPath)) {
   }
 }
 
-const username = (process.env.ADMIN_USERNAME || "admin").trim().toLowerCase();
-const password = process.env.ADMIN_PASSWORD;
-
-if (!password) {
-  console.warn("[seed-admin] ADMIN_PASSWORD no definida — se omite el seed del admin.");
-  process.exit(0);
-}
+// Datos del administrador — email fijo, password configurable por env.
+const ADMIN_EMAIL = "sotero@danalyticspro.co";
+const password = process.env.ADMIN_PASSWORD || "Danalytics2025!";
 
 let url =
   process.env.POSTGRES_URL_NON_POOLING ||
   process.env.POSTGRES_URL ||
   process.env.DATABASE_URL;
+
 if (!url) {
   console.warn("[seed-admin] POSTGRES_URL no definida — se omite el seed del admin.");
   process.exit(0);
 }
+
 if (/supabase\.(co|com|net)/.test(url)) {
   try {
     const u = new URL(url);
@@ -62,24 +59,9 @@ try {
      on conflict (email) do update set
        password_hash = excluded.password_hash,
        active        = true`,
-    [username, hash]
+    [ADMIN_EMAIL, hash]
   );
-  console.log(`[seed-admin] Admin "${username}" listo (activo).`);
-
-  // Solo en local (Vercel define VERCEL=1): un usuario normal de prueba.
-  if (!process.env.VERCEL) {
-    const testEmail = "sotero@danalyticspro.co";
-    const testHash = await bcrypt.hash("123", 12);
-    await client.query(
-      `insert into users (email, password_hash, active)
-       values ($1, $2, true)
-       on conflict (email) do update set
-         password_hash = excluded.password_hash,
-         active        = true`,
-      [testEmail, testHash]
-    );
-    console.log(`[seed-admin] Usuario de prueba "${testEmail}" listo (solo local).`);
-  }
+  console.log(`[seed-admin] Admin "${ADMIN_EMAIL}" listo (activo).`);
 } catch (err) {
   console.error("[seed-admin] Error:", err.message);
   process.exit(1);

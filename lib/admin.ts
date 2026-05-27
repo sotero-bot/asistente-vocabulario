@@ -1,15 +1,14 @@
-// Es admin el usuario sembrado por seed-admin (ADMIN_USERNAME, default "admin")
-// o cualquier email listado en ADMIN_EMAILS (separados por coma).
+const ADMIN_EMAIL = "sotero@danalyticspro.co";
+
 export function isAdmin(identifier: string | null | undefined): boolean {
   if (!identifier) return false;
   const id = identifier.trim().toLowerCase();
 
-  const adminUsername = (process.env.ADMIN_USERNAME || "admin").trim().toLowerCase();
-  if (id === adminUsername) return true;
+  if (id === ADMIN_EMAIL) return true;
 
-  const allow = (process.env.ADMIN_EMAILS ?? "")
+  const extra = (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  return allow.includes(id);
+  return extra.includes(id);
 }
