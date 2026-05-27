@@ -15,9 +15,17 @@ create table if not exists users (
   sector            text,
   custom_sector     text,
   tone              text,
+  active            boolean not null default true,
+  password_hash     text,
   created_at        timestamptz not null default now(),
   last_seen_at      timestamptz not null default now()
 );
+
+-- Control de acceso: si active = false, el usuario no puede iniciar sesión ni usar el chat.
+alter table users add column if not exists active boolean not null default true;
+
+-- Login por contraseña (hash bcrypt). Se provisiona con: npm run set-password.
+alter table users add column if not exists password_hash text;
 
 create table if not exists conversations (
   id          uuid primary key default gen_random_uuid(),

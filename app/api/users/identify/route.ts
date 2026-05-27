@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { auth } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
+  const session = await auth();
+  const email = session?.user?.email?.trim().toLowerCase();
+  if (!email) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -12,7 +17,6 @@ export async function POST(req: NextRequest) {
   }
 
   const {
-    email,
     profession,
     profession_label,
     custom_profession,
@@ -21,14 +25,8 @@ export async function POST(req: NextRequest) {
     tone,
   } = (body ?? {}) as Record<string, string | undefined>;
 
-  if (!email || !EMAIL_RE.test(email)) {
-    return NextResponse.json({ error: "Email inválido" }, { status: 400 });
-  }
-
-  const normalizedEmail = email.trim().toLowerCase();
-
   try {
-    const result = await db.query<{ id: string }>(
+    const result = await db.query<{ id: string; active: boolean }>(
       `insert into users
          (email, profession, profession_label, custom_profession, sector, custom_sector, tone)
        values ($1, $2, $3, $4, $5, $6, $7)
@@ -40,9 +38,9 @@ export async function POST(req: NextRequest) {
          custom_sector     = coalesce(excluded.custom_sector, users.custom_sector),
          tone              = coalesce(excluded.tone, users.tone),
          last_seen_at      = now()
-       returning id`,
+       returning id, active`,
       [
-        normalizedEmail,
+        email,
         profession ?? null,
         profession_label ?? null,
         custom_profession ?? null,
@@ -51,6 +49,9 @@ export async function POST(req: NextRequest) {
         tone ?? null,
       ]
     );
+    if (!result.rows[0].active) {
+      return NextResponse.json({ error: "Cuenta desactivada" }, { status: 403 });
+    }
     return NextResponse.json({ user_id: result.rows[0].id });
   } catch (err) {
     console.error("identify error", err);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getActiveUser } from "@/lib/session";
 
 const VALID_REASONS = new Set([
   "incorrecto",
@@ -9,6 +10,12 @@ const VALID_REASONS = new Set([
 ]);
 
 export async function POST(req: NextRequest) {
+  const authedUser = await getActiveUser();
+  if (!authedUser) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+  const userId = authedUser.userId;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -16,16 +23,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { userId, messageId, reason, userComment } = (body ?? {}) as {
-    userId?: string;
+  const { messageId, reason, userComment } = (body ?? {}) as {
     messageId?: string | null;
     reason?: string;
     userComment?: string;
   };
 
-  if (!userId) {
-    return NextResponse.json({ error: "userId requerido" }, { status: 400 });
-  }
   if (!reason || !VALID_REASONS.has(reason)) {
     return NextResponse.json({ error: "Motivo inválido" }, { status: 400 });
   }

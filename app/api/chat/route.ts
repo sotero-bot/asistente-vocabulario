@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { GLOSSARY_TERMS } from "@/lib/glossary";
 import { db } from "@/lib/db";
+import { getActiveUser } from "@/lib/session";
 
 export async function POST(req: NextRequest) {
+  const authedUser = await getActiveUser();
+  if (!authedUser) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+  const userId = authedUser.userId;
+
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const {
     messages,
@@ -11,7 +18,6 @@ export async function POST(req: NextRequest) {
     systemPromptContext,
     tonePrompt,
     tone,
-    userId,
     conversationId,
     termClicked,
   } = await req.json();
@@ -20,13 +26,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Mensajes inválidos" }, { status: 400 });
   }
 
-  // Resolve / create conversation when we have a userId
-  let activeConversationId: string | null = conversationId ?? null;
+  // Resolve / create conversation. Solo se acepta un conversationId si pertenece
+  // al usuario autenticado; de lo contrario se ignora y se crea uno nuevo.
+  let activeConversationId: string | null = null;
   let userMessageId: string | null = null;
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user");
 
   if (userId) {
     try {
+      if (conversationId) {
+        const owns = await db.query(
+          "select 1 from conversations where id = $1 and user_id = $2 limit 1",
+          [conversationId, userId]
+        );
+        if (owns.rowCount) activeConversationId = conversationId;
+      }
       if (!activeConversationId) {
         const r = await db.query<{ id: string }>(
           "insert into conversations (user_id) values ($1) returning id",
